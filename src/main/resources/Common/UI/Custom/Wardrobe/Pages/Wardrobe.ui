@@ -142,6 +142,25 @@ Group {
             }
           }
 
+          Group #CharacterCreation {
+            Visible: false;
+            LayoutMode: Top;
+            Anchor: (Height: 112, Top: 12);
+            Label { Text: "CHARACTER NAME"; Style: @HeadlineLabelStyle; Anchor: (Height: 24); }
+            TextField #CharacterName {
+              Anchor: (Height: 36);
+              PlaceholderText: "Enter a character name";
+              Style: (FontSize: 18);
+              Background: #101923;
+              Padding: (Horizontal: 12);
+            }
+            Label #CreationStatus {
+              Text: "2–24 characters, starting with a letter.";
+              Anchor: (Height: 40);
+              Style: (FontSize: 14, TextColor: #d9bd76, Wrap: true);
+            }
+          }
+
           Group #Cosmetics {
             LayoutMode: TopScrolling;
             ScrollbarStyle: $Common.@DefaultScrollbarStyle;

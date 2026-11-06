@@ -54,6 +54,24 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
     public final ServerCameraSettings defaultCamera;
     public final boolean canChangeCamera;
     private boolean shouldClose = true;
+    private CreationHandler creation;
+    private boolean submitting;
+    private boolean accepted;
+
+    /** Optional character-creation host. The draft never replaces the live player's cosmetics. */
+    public interface CreationHandler {
+        void preview(PlayerWardrobeComponent draft);
+        java.util.concurrent.CompletableFuture<Void> accept(String name, PlayerWardrobeComponent draft);
+        void cancel();
+        default void closed() {}
+    }
+
+    public WardrobePage(PlayerRef playerRef, PlayerWardrobeComponent draft, ServerCameraSettings camera,
+                        CreationHandler creation) {
+        this(playerRef, draft, camera, false);
+        this.creation = java.util.Objects.requireNonNull(creation);
+        setLifetime(CustomPageLifetime.CantClose);
+    }
 
     public WardrobePage(@Nonnull PlayerRef playerRef, PlayerWardrobeComponent wardrobe, ServerCameraSettings defaultCamera, boolean canChangeCamera) {
         super(playerRef, CustomPageLifetime.CanDismiss, PageEventData.CODEC);
@@ -76,12 +94,18 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
         eventBuilder.addEventBinding(CustomUIEventBindingType.ValueChanged, "#SearchField", EventData.of("@SearchQuery", "#SearchField.Value"), false);
         eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#ResetAvatar", MenuAction.Reset.getEvent(), false);
         eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#Discard", MenuAction.Discard.getEvent(), false);
-        eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#Save", MenuAction.Save.getEvent(), false);
+        commandBuilder.set("#CharacterCreation.Visible", creation != null);
+        if (creation != null) commandBuilder.set("#Save.Text", "Create Character");
+        eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#Save", creation == null
+                ? MenuAction.Save.getEvent()
+                : EventData.of("Action", "Save").append("@CharacterName", "#CharacterName.Value"), false);
+        if (creation != null) creation.preview(menu.getWardrobe());
     }
 
     @Override
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, @Nonnull PageEventData data) {
         super.handleDataEvent(ref, store, data);
+        if (submitting || accepted) return;
 
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
@@ -127,6 +151,7 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
                 buildCosmetics(commandBuilder, eventBuilder, ref, store);
             }
             case Discard -> {
+                if (creation != null) { shouldClose = true; close(); return; }
                 store.getExternalData().getWorld().execute(() -> {
                     store.putComponent(ref, PlayerWardrobeComponent.getComponentType(), menu.getBaseWardrobe());
                 });
@@ -135,17 +160,51 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
                 close();
             }
             case Save -> {
+                if (creation != null) {
+                    submitting = true;
+                    UICommandBuilder saving = new UICommandBuilder();
+                    saving.set("#CreationStatus.Text", "Creating your character…");
+                    sendUpdate(saving, false);
+                    java.util.concurrent.CompletableFuture<Void> result;
+                    try { result = creation.accept(data.characterName, menu.getWardrobe().clone()); }
+                    catch (RuntimeException error) { result = java.util.concurrent.CompletableFuture.failedFuture(error); }
+                    result.whenComplete((ignored, error) -> {
+                        // Successful acceptance may replace the player's entity and close this page.
+                        if (error == null) { accepted = true; return; }
+                        var current = playerRef.getReference();
+                        if (current == null || !current.isValid()) return;
+                        current.getStore().getExternalData().getWorld().execute(() -> {
+                            submitting = false;
+                            if (!current.isValid()) return;
+                            Player activePlayer = current.getStore().getComponent(current, Player.getComponentType());
+                            if (activePlayer == null || activePlayer.getPageManager().getCustomPage() != this) return;
+                            Throwable cause = error;
+                            while (cause.getCause() != null) cause = cause.getCause();
+                            UICommandBuilder failed = new UICommandBuilder();
+                            failed.set("#CreationStatus.Text", cause.getMessage() == null ? "Unable to create character." : cause.getMessage());
+                            sendUpdate(failed, false);
+                        });
+                    });
+                    return;
+                }
                 shouldClose = true;
                 close();
             }
         }
 
         shouldClose = menu.getWardrobe().equals(menu.getBaseWardrobe());
+        if (creation != null) creation.preview(menu.getWardrobe());
         sendUpdate(commandBuilder, eventBuilder, false);
     }
 
     @Override
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        if (creation != null) {
+            creation.closed();
+            super.onDismiss(ref, store);
+            if (!submitting && !accepted) creation.cancel();
+            return;
+        }
         if (!shouldClose) {
             shouldClose = true;
             store.getExternalData().getWorld().execute(() -> {
@@ -410,6 +469,7 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
 
     public static class PageEventData {
         public static final BuilderCodec<PageEventData> CODEC = BuilderCodec.builder(PageEventData.class, PageEventData::new)
+                .append(new KeyedCodec<>("@CharacterName", Codec.STRING), (e, v) -> e.characterName = v, e -> e.characterName).add()
                 .append(new KeyedCodec<>("@SearchQuery", Codec.STRING), (e, v) -> e.searchQuery = v, e -> e.searchQuery).add()
                 .append(new KeyedCodec<>("Categories", Codec.STRING), (e, v) -> e.category = v, e -> e.category).add()
                 .append(new KeyedCodec<>("Slots", Codec.STRING), (e, v) -> e.slot = v, e -> e.slot).add()
@@ -420,6 +480,7 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
                 .append(new KeyedCodec<>("Action", new EnumCodec<>(MenuAction.class)), (e, v) -> e.action = v, e -> e.action).add()
                 .build();
 
+        private String characterName;
         private String searchQuery;
         private String category;
         private String slot;

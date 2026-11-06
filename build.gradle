@@ -34,7 +34,8 @@ repositories {
 }
 
 dependencies {
-    implementation("com.hypixel.hytale:Server:${project.hytale_version}")
+    // Match the installed server used by HyMMO, including patch-level API changes.
+    implementation(files("${hytaleHome}/install/${project.hytale_patchline}/package/game/latest/Server/HytaleServer.jar"))
 }
 
 processResources {

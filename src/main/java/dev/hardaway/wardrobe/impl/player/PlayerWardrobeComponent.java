@@ -82,7 +82,7 @@ public class PlayerWardrobeComponent implements PlayerWardrobe, Component<Entity
         }
 
         if (CosmeticAsset.getAssetMap().getAsset(cosmetic.getCosmeticId()) instanceof PlayerModelCosmetic) {
-            for (Map.Entry<String, CosmeticSaveData> entry : this.cosmetics.entrySet()) {
+            for (Map.Entry<String, CosmeticSaveData> entry : new HashMap<>(this.cosmetics).entrySet()) {
                 String slotId = entry.getKey();
                 CosmeticSaveData existingCosmetic = entry.getValue();
 
@@ -106,6 +106,7 @@ public class PlayerWardrobeComponent implements PlayerWardrobe, Component<Entity
     @Override
     public void clearCosmetics() {
         this.cosmetics.clear();
+        this.cosmeticIdSet.clear();
     }
 
     @Override
