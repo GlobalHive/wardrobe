@@ -81,6 +81,11 @@ public class HytaleCosmetic implements Cosmetic {
             }
         }
 
+        // Native face/ear/mouth attachments must also follow a wardrobe-selected skin tone.
+        if ("Skin".equals(gradientSet) && "Skin".equals(context.getPlayerModel().getGradientSet())) {
+            gradientId = context.getPlayerModel().getGradientId();
+        }
+
         if (this.part.getHeadAccessoryType() == PlayerSkinPart.HeadAccessoryType.FullyCovering) {
             context.hideSlots("Haircut");
         }

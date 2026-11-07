@@ -114,7 +114,14 @@ public class PlayerWardrobeSystems {
             }
 
             // Apply custom cosmetics
-            context.getCosmeticMap().forEach((slotId, cosmetic) -> {
+            // Establish the body/skin gradient before attachments resolve their skin tone.
+            context.getCosmeticMap().entrySet().stream()
+                    .sorted(java.util.Comparator.comparingInt(entry ->
+                            entry.getValue() instanceof dev.hardaway.wardrobe.impl.cosmetic.PlayerModelCosmetic
+                            || entry.getValue() instanceof dev.hardaway.wardrobe.impl.cosmetic.builtin.HytaleBodyCharacteristicCosmetic ? 0 : 1))
+                    .forEach(entry -> {
+                String slotId = entry.getKey();
+                var cosmetic = entry.getValue();
                 WardrobeCosmeticSlot slot = slots.get(slotId); // TODO: replace with registry
                 if (slot != null) {
                     // TODO: validate & warn

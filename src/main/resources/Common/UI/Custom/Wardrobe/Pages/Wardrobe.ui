@@ -162,6 +162,8 @@ Group {
           }
 
           Group #Cosmetics {
+            FlexWeight: 1;
+            Anchor: (Top: 5);
             LayoutMode: TopScrolling;
             ScrollbarStyle: $Common.@DefaultScrollbarStyle;
           }

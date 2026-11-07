@@ -17,10 +17,8 @@ import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
-import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
-import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -57,6 +55,7 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
     private CreationHandler creation;
     private boolean submitting;
     private boolean accepted;
+    private boolean creationCameraSent;
 
     /** Optional character-creation host. The draft never replaces the live player's cosmetics. */
     public interface CreationHandler {
@@ -243,7 +242,11 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
             }
         }
 
-        playerRef.getPacketHandler().writeNoCache(new SetServerCamera(ClientCameraView.Custom, true, camera));
+        // A creation scene has one fixed camera; tab/search/cosmetic updates must not restart it.
+        if (creation == null || !creationCameraSent) {
+            playerRef.getPacketHandler().writeNoCache(new SetServerCamera(ClientCameraView.Custom, true, camera));
+            if (creation != null) creationCameraSent = true;
+        }
     }
 
     private void buildTabs(UICommandBuilder commandBuilder, UIEventBuilder eventBuilder, String tabGroup, String selected, WardrobeTab... tabs) {
@@ -291,14 +294,8 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
         commandBuilder.set("#OptionsContainer.Visible", false);
         commandBuilder.set("#OptionsDropdown.Visible", false);
 
-        Anchor anchor = new Anchor();
-        anchor.setTop(Value.of(5));
-
         List<WardrobeCosmetic> cosmetics = menu.getCosmetics();
         PlayerCosmetic worn = menu.getWardrobe().getCosmetic(menu.getSelectedSlot());
-
-        double optionRows = 0;
-        int variantRows = 0;
 
         int row = -1;
         for (int i = 0; i < cosmetics.size(); i++) {
@@ -344,8 +341,8 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
 
             if (worn != null && cosmetic.getId().equals(worn.getCosmeticId())) {
                 commandBuilder.set(selector + " #Selected.Visible", true);
-                optionRows = buildOptions(commandBuilder, eventBuilder, worn, cosmetic);
-                variantRows = buildVariants(commandBuilder, eventBuilder, worn, cosmetic);
+                buildOptions(commandBuilder, eventBuilder, worn, cosmetic);
+                buildVariants(commandBuilder, eventBuilder, worn, cosmetic);
             }
 
             if (worn != null && worn.getOptionId() != null) {
@@ -385,15 +382,7 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
             else commandBuilder.set(selector + " #Button.TooltipText", tooltip.getChildren().getFirst());
         }
 
-        int rowHeight = 150;
-        int rowSpacing = 30;
-
-        double rows = Math.max(0, 4.8 - optionRows - variantRows);
-
-        int height = (int) (rowHeight * rows + rowSpacing * Math.max(0, rows - 1));
-
-        anchor.setHeight(Value.of(height));
-        commandBuilder.setObject("#Cosmetics.Anchor", anchor);
+        // The scrolling list flexes into the space left by the name, variants and options controls.
     }
 
     private double buildOptions(UICommandBuilder commandBuilder, UIEventBuilder eventBuilder, PlayerCosmetic wornCosmetic, WardrobeCosmetic cosmetic) {
