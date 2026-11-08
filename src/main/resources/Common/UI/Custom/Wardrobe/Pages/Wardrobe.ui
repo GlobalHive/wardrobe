@@ -227,6 +227,31 @@ Group {
   Group {
     Anchor: (Left: 20, Bottom: 8);
 
+    Group #PreviewRotation {
+      Visible: false;
+      Anchor: (Bottom: 60, Height: 36);
+      LayoutMode: Center;
+
+      $Common.@SecondaryButton #RotatePreviewLeft {
+        @Width = 48;
+        @Anchor = Anchor(Right: 8);
+
+        Group {
+          Background: "../Icons/RotateLeftIcon.png";
+          Anchor: (Width: 35, Height: 35);
+        }
+      }
+      $Common.@SecondaryButton #RotatePreviewRight {
+        @Width = 48;
+        @Anchor = Anchor();
+
+        Group {
+          Background: "../Icons/RotateRightIcon.png";
+          Anchor: (Width: 35, Height: 35);
+        }
+      }
+    }
+
     Group {
       Anchor: (Bottom: 0, Height: 36);
       LayoutMode: Center;

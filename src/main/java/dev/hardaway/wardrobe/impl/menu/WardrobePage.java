@@ -63,6 +63,7 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
         java.util.concurrent.CompletableFuture<Void> accept(String name, PlayerWardrobeComponent draft);
         void cancel();
         default void closed() {}
+        default void rotate(boolean right) {}
     }
 
     public WardrobePage(PlayerRef playerRef, PlayerWardrobeComponent draft, ServerCameraSettings camera,
@@ -98,7 +99,12 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
         eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#Save", creation == null
                 ? MenuAction.Save.getEvent()
                 : EventData.of("Action", "Save").append("@CharacterName", "#CharacterName.Value"), false);
-        if (creation != null) creation.preview(menu.getWardrobe());
+        commandBuilder.set("#PreviewRotation.Visible", creation != null);
+        if (creation != null) {
+            eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#RotatePreviewLeft", MenuAction.RotateLeft.getEvent(), false);
+            eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#RotatePreviewRight", MenuAction.RotateRight.getEvent(), false);
+            creation.preview(menu.getWardrobe());
+        }
     }
 
     @Override
@@ -143,6 +149,10 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
         switch (data.action) {
             case null -> {
             } // Do nothing
+            case RotateLeft, RotateRight -> {
+                if (creation != null) creation.rotate(data.action == MenuAction.RotateRight);
+                return;
+            }
             case Reset -> {
                 menu.getWardrobe().clearCosmetics();
                 menu.getWardrobe().getHiddenCosmeticTypes().clear(); // TODO: replace this with proper api method
@@ -481,7 +491,7 @@ public class WardrobePage extends InteractiveCustomUIPage<WardrobePage.PageEvent
     }
 
     public enum MenuAction {
-        Reset, Discard, Save;
+        Reset, Discard, Save, RotateLeft, RotateRight;
 
         private final EventData eventData;
 
